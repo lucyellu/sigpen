@@ -78,35 +78,84 @@ Available scripts (run from `web/`):
 | `pnpm preview` | Serve the production bundle on `0.0.0.0:4173`. |
 | `pnpm typecheck` | TypeScript only, no emit. |
 
-## Using it on an iPad (over LAN)
+## Using it on an iPad
 
-1. On the dev machine, run **both** servers in two terminals:
-   ```bash
-   uv run uvicorn api.main:app --reload --port 8000     # terminal 1
-   cd web && pnpm dev                                   # terminal 2
-   ```
-2. Find the dev machine's LAN IP (e.g. `192.168.1.42`). On macOS:
-   `ipconfig getifaddr en0`. On Windows: `ipconfig`.
-3. Put the iPad on the same Wi-Fi network.
-4. In Safari on the iPad, visit `http://192.168.1.42:5173/` (substitute
-   your LAN IP). The Console page will load with live GOES X-rays.
-5. Optional: tap the share icon → **Add to Home Screen**. The PWA
-   manifest + Apple touch icon give it its own dark-themed app tile.
+Two supported paths. **Cloudflare tunnel** is recommended — the iPad can be
+on any network (not just your home Wi-Fi), no firewall opening, no IP to
+look up. **LAN** is faster to spin up if your iPad and dev machine share
+Wi-Fi anyway.
 
-### LAN troubleshooting
+### Path A — Cloudflare quick tunnel (recommended)
 
-- **Browser shows "can't reach server":** your dev machine's firewall
-  is probably blocking inbound 5173. On macOS, allow `node` in System
-  Settings → Network → Firewall. On Windows, the first time Vite binds
-  the port you'll get a Windows Defender Firewall prompt — accept it
-  for **Private networks**.
-- **You're on a captive / "guest" Wi-Fi:** many of those isolate
-  clients from each other; switch both devices to your main network.
-- **Vite's IP autodetect printed two addresses** (e.g. one for Wi-Fi
-  and one for a VPN tunnel): pick the Wi-Fi one.
-- The FastAPI server itself only binds loopback (`127.0.0.1`) — the
-  iPad never speaks to it directly, only through Vite. Don't expose
-  port 8000 to the LAN unless you actually need to.
+A free temporary `https://*.trycloudflare.com` URL that proxies straight
+to the Vite dev server on the dev machine. No Cloudflare account needed,
+no DNS, no port forwarding. The URL rotates every time you start the
+tunnel — paste the new one into Safari on the iPad.
+
+**One-time:** install `cloudflared` on the dev machine.
+
+| OS | Install |
+| --- | --- |
+| macOS | `brew install cloudflare/cloudflare/cloudflared` |
+| Windows | Download `cloudflared-windows-amd64.exe` from <https://github.com/cloudflare/cloudflared/releases>, rename to `cloudflared.exe`, put it on `PATH`. |
+| Linux (deb) | `curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o /tmp/cloudflared.deb && sudo dpkg -i /tmp/cloudflared.deb` |
+
+Verify with `cloudflared --version`.
+
+**Each session:** three terminals on the dev machine.
+
+```bash
+# terminal 1 — backend
+uv run uvicorn api.main:app --reload --port 8000
+
+# terminal 2 — frontend
+cd web && pnpm dev
+
+# terminal 3 — public tunnel (start *after* Vite is up on :5173)
+cd web && pnpm tunnel
+```
+
+`pnpm tunnel` is a wrapper for `cloudflared tunnel --url http://localhost:5173`.
+After a few seconds it prints a line like:
+
+```
+2026-05-12T20:21:55Z INF +--------------------------------------------------------------------------------------------+
+2026-05-12T20:21:55Z INF |  Your quick Tunnel has been created! Visit it at (it may take a few seconds):              |
+2026-05-12T20:21:55Z INF |  https://example-words-here.trycloudflare.com                                              |
+2026-05-12T20:21:55Z INF +--------------------------------------------------------------------------------------------+
+```
+
+Paste that URL into Safari on the iPad. Console loads, GOES X-rays
+update every 60 s. Add-to-Home-Screen also works.
+
+**Notes:**
+
+- The Cloudflare edge terminates TLS; your local Vite server stays HTTP.
+- Vite HMR over a tunneled origin sometimes fails to upgrade — if the
+  page loads but doesn't auto-refresh on save, that's it; just hard-refresh
+  the iPad tab. For a more robust static preview, run `pnpm build`,
+  then `pnpm preview` (binds 4173), then `pnpm tunnel:preview`.
+- The tunnel only exposes Vite on 5173. FastAPI on 8000 stays on loopback;
+  the iPad never reaches it directly, only via Vite's `/api/*` proxy.
+- Stop the tunnel with Ctrl-C. The URL dies with it.
+
+### Path B — LAN (same Wi-Fi only)
+
+1. Run both servers as in Path A (terminals 1 and 2 only — no tunnel).
+2. Find the dev machine's LAN IP. macOS: `ipconfig getifaddr en0`.
+   Windows: `ipconfig` (look for the IPv4 entry under your Wi-Fi adapter).
+3. Put the iPad on the same Wi-Fi.
+4. Safari → `http://192.168.x.x:5173/` (substitute your LAN IP).
+
+**LAN troubleshooting:**
+
+- *"Can't reach server":* your dev machine's firewall is blocking inbound
+  5173. On macOS, allow `node` in System Settings → Network → Firewall.
+  On Windows, the first time Vite binds the port you'll get a Windows
+  Defender Firewall prompt — accept it for **Private networks**.
+- *Captive / "guest" Wi-Fi* isolates clients; switch both devices to your
+  main network or use Path A.
+- *Vite printed two LAN IPs* (e.g. Wi-Fi + VPN tunnel): pick the Wi-Fi one.
 
 ## Data sources (attribution)
 

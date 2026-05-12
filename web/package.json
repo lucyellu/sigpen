@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "tunnel": "cloudflared tunnel --url http://localhost:5173",
+    "tunnel:preview": "cloudflared tunnel --url http://localhost:4173"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.59.0",
