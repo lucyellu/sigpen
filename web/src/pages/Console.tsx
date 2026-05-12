@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, GridResponse, SourcesResponse } from "../lib/api";
+import { api, GridResponse, HealthResponse, SourcesResponse } from "../lib/api";
 import { Readout } from "../components/Readout";
 import { Sparkline } from "../components/Sparkline";
 import { flareClass, fluxFormat, lastNonNull } from "../lib/flares";
 import { localClock, relTime } from "../lib/time";
 
 const REFRESH_MS = 60_000;
+const STALE_MINUTES = 10;
 
 // Channels the Console wants to show. Anything that's not yet wired into the
 // backend shows up as a placeholder card — keeps the layout honest about the
@@ -18,6 +19,21 @@ const TERRA_PENDING = [
   { key: "kp", label: "Planetary K", unit: "" },
   { key: "aurora_extent", label: "Aurora extent", unit: "°" },
 ];
+
+type CardState = "live" | "stale" | "empty";
+
+function cardState(
+  hasSample: boolean,
+  sampleTs: string | null,
+  isError: boolean,
+  isLoading: boolean,
+): CardState {
+  if (isError) return "empty";
+  if (!hasSample) return isLoading ? "empty" : "empty";
+  if (!sampleTs) return "empty";
+  const ageMin = (Date.now() - new Date(sampleTs).getTime()) / 60_000;
+  return ageMin > STALE_MINUTES ? "stale" : "live";
+}
 
 export function Console() {
   const grid = useQuery<GridResponse>({
@@ -32,15 +48,25 @@ export function Console() {
     refetchInterval: REFRESH_MS,
   });
 
+  const health = useQuery<HealthResponse>({
+    queryKey: ["health"],
+    queryFn: api.health,
+    refetchInterval: REFRESH_MS,
+  });
+
   const xrsB = grid.data?.channels.xrs_b ?? [];
   const xrsA = grid.data?.channels.xrs_a ?? [];
   const ts = grid.data?.ts ?? [];
 
   const lastB = lastNonNull(xrsB);
   const lastA = lastNonNull(xrsA);
-  const lastTs = lastB ? ts[lastB.index] : grid.data?.end ?? null;
+  const lastBTs = lastB ? ts[lastB.index] : null;
+  const lastATs = lastA ? ts[lastA.index] : null;
+
+  const stateB = cardState(lastB != null, lastBTs, grid.isError, grid.isLoading);
+  const stateA = cardState(lastA != null, lastATs, grid.isError, grid.isLoading);
+
   const goes = sources.data?.sources.find((s) => s.name === "goes_xrays");
-  const stale = lastTs ? (Date.now() - new Date(lastTs).getTime()) / 60_000 > 10 : true;
 
   return (
     <div className="mx-auto flex min-h-full max-w-3xl flex-col gap-6 px-4 py-6 sm:px-6">
@@ -63,12 +89,14 @@ export function Console() {
           <Readout
             label="GOES XRS-B · flare class"
             accent="sol"
-            state={grid.isError ? "empty" : stale ? "stale" : "live"}
-            value={flareClass(lastB?.value ?? null)}
+            state={stateB}
+            value={lastB ? flareClass(lastB.value) : "—"}
             caption={
-              <>
-                {fluxFormat(lastB?.value ?? null)} W/m² · {relTime(lastTs)}
-              </>
+              lastB
+                ? `${fluxFormat(lastB.value)} W/m² · ${relTime(lastBTs)}`
+                : grid.isLoading
+                  ? "listening for first sample…"
+                  : "no samples yet"
             }
           >
             <Sparkline
@@ -84,10 +112,14 @@ export function Console() {
           <Readout
             label="GOES XRS-A · short band"
             accent="sol"
-            state={grid.isError ? "empty" : stale ? "stale" : "live"}
-            value={fluxFormat(lastA?.value ?? null)}
-            unit="W/m²"
-            caption={<>0.05–0.4 nm · {relTime(lastTs)}</>}
+            state={stateA}
+            value={lastA ? fluxFormat(lastA.value) : "—"}
+            unit={lastA ? "W/m²" : undefined}
+            caption={
+              lastA
+                ? `0.05–0.4 nm · ${relTime(lastATs)}`
+                : "0.05–0.4 nm · waiting"
+            }
           >
             <Sparkline
               values={xrsA}
@@ -134,8 +166,11 @@ export function Console() {
         goesLastTs={goes?.last_ts ?? null}
         pollOk={goes?.last_poll?.ok ?? null}
         pollError={goes?.last_poll?.error ?? null}
-        loading={grid.isLoading || sources.isLoading}
-        fetchError={grid.error?.message ?? sources.error?.message ?? null}
+        schedulerEnabled={health.data?.scheduler_enabled ?? null}
+        loading={grid.isLoading || sources.isLoading || health.isLoading}
+        fetchError={
+          grid.error?.message ?? sources.error?.message ?? health.error?.message ?? null
+        }
       />
     </div>
   );
@@ -145,6 +180,7 @@ function StatusLine(props: {
   goesLastTs: string | null;
   pollOk: boolean | null;
   pollError: string | null;
+  schedulerEnabled: boolean | null;
   loading: boolean;
   fetchError: string | null;
 }) {
@@ -153,6 +189,8 @@ function StatusLine(props: {
     msg = `Backend unreachable — ${props.fetchError}`;
   } else if (props.loading) {
     msg = "Listening…";
+  } else if (props.schedulerEnabled === false) {
+    msg = "Scheduler is disabled (SIGPEN_DISABLE_SCHEDULER=1). No new polls.";
   } else if (props.pollOk === false) {
     msg = `Last poll failed: ${props.pollError ?? "unknown error"}`;
   } else if (props.goesLastTs) {
