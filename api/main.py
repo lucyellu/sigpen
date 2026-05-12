@@ -51,10 +51,22 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Sun-Earth Translator API", version="0.1.0", lifespan=lifespan)
 
-# The web SPA runs on Vite (5173) in dev. Permissive in dev; tighten later.
+# The web SPA runs on Vite (5173) in dev and proxies /api/* — so in normal use
+# the browser never makes a cross-origin call to FastAPI at all. We still
+# allow localhost / loopback / private LAN origins as a safety net for
+# direct-fetch tools (curl from another machine, occasional debugging) and
+# to keep iPad-on-LAN setups from getting tripped up by a misconfigured proxy.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origin_regex=(
+        r"^https?://("
+        r"localhost(:\d+)?|"
+        r"127\.0\.0\.1(:\d+)?|"
+        r"10(\.\d{1,3}){3}(:\d+)?|"
+        r"192\.168(\.\d{1,3}){2}(:\d+)?|"
+        r"172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2}(:\d+)?"
+        r")$"
+    ),
     allow_methods=["GET", "POST", "PUT"],
     allow_headers=["*"],
 )
