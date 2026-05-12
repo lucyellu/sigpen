@@ -1,0 +1,32 @@
+# Data store
+/data/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.uv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node / web
+node_modules/
+dist/
+.vite/
+.pnpm-store/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Env
+.env
+.env.local
