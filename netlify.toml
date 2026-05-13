@@ -1,0 +1,22 @@
+# Netlify build for the Vite SPA in web/.
+# The app fetches NOAA SWPC directly from the browser — no backend, no
+# Functions, no proxy. This file just tells Netlify which directory to
+# build and where the built bundle ends up.
+
+[build]
+base    = "web"
+command = "pnpm install --frozen-lockfile && pnpm build"
+publish = "dist"
+
+[build.environment]
+# pnpm is auto-detected from packageManager in web/package.json, but pinning
+# Node prevents drift if Netlify rolls their default forward.
+NODE_VERSION = "20"
+
+# SPA fallback: all unmatched routes serve index.html so client-side routing
+# works if/when we add it. Static assets under /assets/* are already served
+# directly by Netlify before this rule fires.
+[[redirects]]
+from   = "/*"
+to     = "/index.html"
+status = 200

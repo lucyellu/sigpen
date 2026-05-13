@@ -1,16 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, GridResponse, HealthResponse, SourcesResponse } from "../lib/api";
 import { Readout } from "../components/Readout";
 import { Sparkline } from "../components/Sparkline";
 import { flareClass, fluxFormat, lastNonNull } from "../lib/flares";
+import { fetchGoesXrays, GoesGrid } from "../lib/swpc";
 import { localClock, relTime } from "../lib/time";
 
 const REFRESH_MS = 60_000;
 const STALE_MINUTES = 10;
 
-// Channels the Console wants to show. Anything that's not yet wired into the
-// backend shows up as a placeholder card — keeps the layout honest about the
-// build state instead of hiding the missing tiles.
+// Channels that aren't fetched yet — render as placeholders so the layout
+// stays honest about the build state instead of hiding the missing tiles.
 const SOL_PENDING = [
   { key: "wind_speed", label: "Solar wind", unit: "km/s" },
   { key: "bz", label: "IMF Bz", unit: "nT" },
@@ -22,51 +21,31 @@ const TERRA_PENDING = [
 
 type CardState = "live" | "stale" | "empty";
 
-function cardState(
-  hasSample: boolean,
-  sampleTs: string | null,
-  isError: boolean,
-  isLoading: boolean,
-): CardState {
-  if (isError) return "empty";
-  if (!hasSample) return isLoading ? "empty" : "empty";
-  if (!sampleTs) return "empty";
+function cardState(sampleTs: string | null, isError: boolean): CardState {
+  if (isError || !sampleTs) return "empty";
   const ageMin = (Date.now() - new Date(sampleTs).getTime()) / 60_000;
   return ageMin > STALE_MINUTES ? "stale" : "live";
 }
 
 export function Console() {
-  const grid = useQuery<GridResponse>({
-    queryKey: ["grid", "xrs"],
-    queryFn: () => api.grid({ channels: ["xrs_a", "xrs_b"], resolution: "1min" }),
+  const goes = useQuery<GoesGrid>({
+    queryKey: ["goes_xrays"],
+    queryFn: fetchGoesXrays,
     refetchInterval: REFRESH_MS,
+    staleTime: REFRESH_MS,
   });
 
-  const sources = useQuery<SourcesResponse>({
-    queryKey: ["sources"],
-    queryFn: api.sources,
-    refetchInterval: REFRESH_MS,
-  });
-
-  const health = useQuery<HealthResponse>({
-    queryKey: ["health"],
-    queryFn: api.health,
-    refetchInterval: REFRESH_MS,
-  });
-
-  const xrsB = grid.data?.channels.xrs_b ?? [];
-  const xrsA = grid.data?.channels.xrs_a ?? [];
-  const ts = grid.data?.ts ?? [];
+  const xrsB = goes.data?.channels.xrs_b ?? [];
+  const xrsA = goes.data?.channels.xrs_a ?? [];
+  const ts = goes.data?.ts ?? [];
 
   const lastB = lastNonNull(xrsB);
   const lastA = lastNonNull(xrsA);
   const lastBTs = lastB ? ts[lastB.index] : null;
   const lastATs = lastA ? ts[lastA.index] : null;
 
-  const stateB = cardState(lastB != null, lastBTs, grid.isError, grid.isLoading);
-  const stateA = cardState(lastA != null, lastATs, grid.isError, grid.isLoading);
-
-  const goes = sources.data?.sources.find((s) => s.name === "goes_xrays");
+  const stateB = cardState(lastBTs, goes.isError);
+  const stateA = cardState(lastATs, goes.isError);
 
   return (
     <div className="mx-auto flex min-h-full max-w-3xl flex-col gap-6 px-4 py-6 sm:px-6">
@@ -94,7 +73,7 @@ export function Console() {
             caption={
               lastB
                 ? `${fluxFormat(lastB.value)} W/m² · ${relTime(lastBTs)}`
-                : grid.isLoading
+                : goes.isLoading
                   ? "listening for first sample…"
                   : "no samples yet"
             }
@@ -163,40 +142,28 @@ export function Console() {
       </div>
 
       <StatusLine
-        goesLastTs={goes?.last_ts ?? null}
-        pollOk={goes?.last_poll?.ok ?? null}
-        pollError={goes?.last_poll?.error ?? null}
-        schedulerEnabled={health.data?.scheduler_enabled ?? null}
-        loading={grid.isLoading || sources.isLoading || health.isLoading}
-        fetchError={
-          grid.error?.message ?? sources.error?.message ?? health.error?.message ?? null
-        }
+        lastSampleTs={goes.data?.lastSampleTs ?? null}
+        loading={goes.isLoading}
+        fetchError={goes.error?.message ?? null}
       />
     </div>
   );
 }
 
 function StatusLine(props: {
-  goesLastTs: string | null;
-  pollOk: boolean | null;
-  pollError: string | null;
-  schedulerEnabled: boolean | null;
+  lastSampleTs: string | null;
   loading: boolean;
   fetchError: string | null;
 }) {
   let msg: string;
   if (props.fetchError) {
-    msg = `Backend unreachable — ${props.fetchError}`;
+    msg = `SWPC unreachable — ${props.fetchError}`;
   } else if (props.loading) {
     msg = "Listening…";
-  } else if (props.schedulerEnabled === false) {
-    msg = "Scheduler is disabled (SIGPEN_DISABLE_SCHEDULER=1). No new polls.";
-  } else if (props.pollOk === false) {
-    msg = `Last poll failed: ${props.pollError ?? "unknown error"}`;
-  } else if (props.goesLastTs) {
-    msg = `GOES X-rays current as of ${relTime(props.goesLastTs)}. Remaining sources land in build step 3.`;
+  } else if (props.lastSampleTs) {
+    msg = `GOES X-rays current as of ${relTime(props.lastSampleTs)}. Remaining sources land in build step 3.`;
   } else {
-    msg = "Scheduler running. Waiting for first GOES poll…";
+    msg = "Waiting for first GOES sample…";
   }
   return (
     <footer className="mt-auto border-t border-console-line pt-3 text-xs text-console-dim">

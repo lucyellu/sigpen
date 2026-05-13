@@ -1,61 +1,30 @@
 # Sun-Earth Translator
 
 A console for listening to the conversation between the Sun and Earth.
-The backend ingests real-time space-weather feeds (GOES, SWPC, USGS,
-WDC Kyoto), normalizes them into a common time-series store, tokenizes
-solar and terrestrial signals into a small constructed "language," and
-pairs sun → terra exchanges so they can be read like call-and-response.
-The frontend is a Project Hail Mary-styled SPA on top of that data.
+The app pulls real-time space-weather feeds (GOES, SWPC, USGS, WDC
+Kyoto), tokenizes solar and terrestrial signals into a small constructed
+"language," and pairs sun → terra exchanges so they can be read like
+call-and-response. The frontend is a Project Hail Mary-styled SPA.
 
 See `BUILD.md` for the full design brief and build order.
 
 ## Status
 
-**Steps 1–2 of 10 complete.** Backend scaffold (GOES primary X-rays
-fetcher, Parquet/DuckDB storage, `/api/sources` + `/api/grid` + `/api/health`),
-plus a Vite + React + Tailwind SPA with a Console page that polls
-`/api/grid` every 60 s. The web app is responsive from 360 px up and
-configured to be reached from an iPad over LAN.
+**Steps 1–2 of 10 complete.** A Vite + React + Tailwind SPA with a
+Console page that fetches NOAA SWPC's GOES primary X-rays directly
+from the browser every 60 s. Responsive from 360 px up; deployed to
+Netlify as a static bundle. No backend in production.
 
 ## Layout
 
 ```
-/api    FastAPI app, fetchers, storage, scheduler
-/web    Vite + React + Tailwind SPA (Console page only for now)
-/data   Parquet + SQLite, gitignored
-BUILD.md   full design brief
+/web         Vite + React + Tailwind SPA (Console page only for now)
+/api         Legacy FastAPI scaffold — see "About the /api folder" below
+netlify.toml Netlify build config
+BUILD.md     full design brief
 ```
 
-## Backend setup
-
-Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/). Run from the
-repo root — `api/` is a Python package, and `pyproject.toml` lives at the
-top level so `api.main:app` resolves.
-
-```bash
-uv sync
-uv run uvicorn api.main:app --reload --port 8000
-```
-
-The scheduler starts on app boot, polls GOES X-rays every 60 s, and
-writes one Parquet file per UTC day under `data/goes_xrays/`. Set
-`SIGPEN_DISABLE_SCHEDULER=1` to skip polling (useful for tests).
-
-### Endpoints
-
-- `GET /api/health` — liveness + scheduler status
-- `GET /api/sources` — registered sources with last-update timestamps
-- `GET /api/grid?from=&to=&resolution=1min&channels=xrs_a,xrs_b` —
-  multi-channel time grid; gaps come back as `null`
-
-Examples:
-
-```bash
-curl 'http://localhost:8000/api/sources'
-curl 'http://localhost:8000/api/grid?channels=xrs_b&resolution=1min'
-```
-
-## Frontend setup
+## Frontend setup (the whole app)
 
 Requires Node 20+ and [pnpm](https://pnpm.io/).
 
@@ -65,9 +34,8 @@ pnpm install
 pnpm dev
 ```
 
-Vite serves on port 5173, binds to all interfaces (`host: true`), and
-proxies `/api/*` to `http://127.0.0.1:8000`, so the browser only ever
-talks to the Vite host — no CORS, no exposing NOAA to clients.
+Vite serves on port 5173 and binds to all interfaces (`host: true`) so
+the dev server is reachable on LAN and via tunnels.
 
 Available scripts (run from `web/`):
 
@@ -77,22 +45,59 @@ Available scripts (run from `web/`):
 | `pnpm build` | Type-check and produce a production bundle in `web/dist`. |
 | `pnpm preview` | Serve the production bundle on `0.0.0.0:4173`. |
 | `pnpm typecheck` | TypeScript only, no emit. |
+| `pnpm tunnel` | `cloudflared tunnel --url http://localhost:5173` — see iPad section. |
+| `pnpm tunnel:preview` | Same, against the preview server on 4173. |
+
+### How data gets in
+
+The Console queries
+`https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json`
+directly from the browser. SWPC serves that endpoint with
+`Access-Control-Allow-Origin: *`, so no proxy is needed — the iPad,
+LAN browsers, and the production Netlify build all hit NOAA the same
+way. The fetch + normalization lives in `web/src/lib/swpc.ts`; React
+Query handles the 60 s refetch cycle and dedup.
+
+If SWPC ever drops the CORS header (years of stable history, but it's
+their dashboard's dependency too, so unlikely), the fix is a ~10-line
+Netlify Function that re-exposes the JSON.
+
+## Deploying to Netlify
+
+The repo is wired for **<https://sigpenapp.netlify.app/>**. `netlify.toml`
+at the root sets:
+
+```toml
+[build]
+base    = "web"
+command = "pnpm install --frozen-lockfile && pnpm build"
+publish = "dist"
+```
+
+Netlify auto-deploys on every push to the branch the site is linked to.
+SPA routes fall through to `index.html` via the catch-all redirect in
+`netlify.toml`, so future client-side routing works without further
+config.
+
+**No environment variables needed** — the SWPC URL is hard-coded and
+public.
 
 ## Using it on an iPad
 
-Two supported paths. **Cloudflare tunnel** is recommended — the iPad can be
-on any network (not just your home Wi-Fi), no firewall opening, no IP to
-look up. **LAN** is faster to spin up if your iPad and dev machine share
-Wi-Fi anyway.
+Three paths, in order of friction:
 
-### Path A — Cloudflare quick tunnel (recommended)
+### Path A — the deployed Netlify URL
 
-A free temporary `https://*.trycloudflare.com` URL that proxies straight
-to the Vite dev server on the dev machine. No Cloudflare account needed,
-no DNS, no port forwarding. The URL rotates every time you start the
-tunnel — paste the new one into Safari on the iPad.
+Open <https://sigpenapp.netlify.app/> in Safari on the iPad. That's it.
+Add-to-Home-Screen gives it its own dark-themed app tile.
 
-**One-time:** install `cloudflared` on the dev machine.
+### Path B — Cloudflare quick tunnel (live dev preview on the iPad)
+
+If you want to see uncommitted local changes on the iPad without
+deploying, expose your Vite dev server via Cloudflare's free quick
+tunnel.
+
+**One-time install** of `cloudflared`:
 
 | OS | Install |
 | --- | --- |
@@ -100,62 +105,48 @@ tunnel — paste the new one into Safari on the iPad.
 | Windows | Download `cloudflared-windows-amd64.exe` from <https://github.com/cloudflare/cloudflared/releases>, rename to `cloudflared.exe`, put it on `PATH`. |
 | Linux (deb) | `curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o /tmp/cloudflared.deb && sudo dpkg -i /tmp/cloudflared.deb` |
 
-Verify with `cloudflared --version`.
-
-**Each session:** three terminals on the dev machine.
+**Each session,** two terminals:
 
 ```bash
-# terminal 1 — backend
-uv run uvicorn api.main:app --reload --port 8000
-
-# terminal 2 — frontend
-cd web && pnpm dev
-
-# terminal 3 — public tunnel (start *after* Vite is up on :5173)
-cd web && pnpm tunnel
+cd web && pnpm dev      # terminal 1 — Vite on :5173
+cd web && pnpm tunnel   # terminal 2 — public https URL
 ```
 
-`pnpm tunnel` is a wrapper for `cloudflared tunnel --url http://localhost:5173`.
-After a few seconds it prints a line like:
+`pnpm tunnel` prints `https://<random>.trycloudflare.com` after a few
+seconds. Paste into Safari on the iPad. Stop with Ctrl-C; the URL dies
+with the tunnel.
 
-```
-2026-05-12T20:21:55Z INF +--------------------------------------------------------------------------------------------+
-2026-05-12T20:21:55Z INF |  Your quick Tunnel has been created! Visit it at (it may take a few seconds):              |
-2026-05-12T20:21:55Z INF |  https://example-words-here.trycloudflare.com                                              |
-2026-05-12T20:21:55Z INF +--------------------------------------------------------------------------------------------+
-```
+HMR over a tunneled origin sometimes fails to upgrade — if a save
+doesn't auto-refresh the iPad, hard-refresh manually or use
+`pnpm build && pnpm preview && pnpm tunnel:preview` for a stable
+static bundle.
 
-Paste that URL into Safari on the iPad. Console loads, GOES X-rays
-update every 60 s. Add-to-Home-Screen also works.
+### Path C — LAN (same Wi-Fi only)
 
-**Notes:**
-
-- The Cloudflare edge terminates TLS; your local Vite server stays HTTP.
-- Vite HMR over a tunneled origin sometimes fails to upgrade — if the
-  page loads but doesn't auto-refresh on save, that's it; just hard-refresh
-  the iPad tab. For a more robust static preview, run `pnpm build`,
-  then `pnpm preview` (binds 4173), then `pnpm tunnel:preview`.
-- The tunnel only exposes Vite on 5173. FastAPI on 8000 stays on loopback;
-  the iPad never reaches it directly, only via Vite's `/api/*` proxy.
-- Stop the tunnel with Ctrl-C. The URL dies with it.
-
-### Path B — LAN (same Wi-Fi only)
-
-1. Run both servers as in Path A (terminals 1 and 2 only — no tunnel).
+1. `cd web && pnpm dev` on the dev machine.
 2. Find the dev machine's LAN IP. macOS: `ipconfig getifaddr en0`.
-   Windows: `ipconfig` (look for the IPv4 entry under your Wi-Fi adapter).
-3. Put the iPad on the same Wi-Fi.
-4. Safari → `http://192.168.x.x:5173/` (substitute your LAN IP).
+   Windows: `ipconfig` (IPv4 under the Wi-Fi adapter).
+3. iPad on the same Wi-Fi.
+4. Safari → `http://192.168.x.x:5173/`.
 
-**LAN troubleshooting:**
+If the iPad can't reach the dev machine: firewall blocking 5173
+(macOS: allow `node` in System Settings → Network → Firewall; Windows:
+accept the Defender prompt for Private networks), or captive/guest
+Wi-Fi isolating clients (switch networks or use Path B).
 
-- *"Can't reach server":* your dev machine's firewall is blocking inbound
-  5173. On macOS, allow `node` in System Settings → Network → Firewall.
-  On Windows, the first time Vite binds the port you'll get a Windows
-  Defender Firewall prompt — accept it for **Private networks**.
-- *Captive / "guest" Wi-Fi* isolates clients; switch both devices to your
-  main network or use Path A.
-- *Vite printed two LAN IPs* (e.g. Wi-Fi + VPN tunnel): pick the Wi-Fi one.
+## About the `/api` folder
+
+The `/api` directory holds an earlier FastAPI scaffold (APScheduler
+polling, Parquet/DuckDB storage, `/api/sources` + `/api/grid` +
+`/api/health`). It's no longer wired into the frontend — the browser
+fetches NOAA directly — and isn't deployed anywhere. It stays in the
+tree as a reference implementation for sources that need server-side
+caching, secrets, or non-CORS endpoints (USGS Boulder, WDC Kyoto Dst).
+When the time comes, those sources will either move into Netlify
+Functions or this scaffold gets resurrected on a small VM. Until then,
+the SPA in `/web` is the whole app.
+
+You don't need Python or `uv` to develop or deploy the live app.
 
 ## Data sources (attribution)
 
