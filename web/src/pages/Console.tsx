@@ -1,51 +1,94 @@
 import { useQuery } from "@tanstack/react-query";
+import { ReactNode } from "react";
 import { Readout } from "../components/Readout";
 import { Sparkline } from "../components/Sparkline";
-import { flareClass, fluxFormat, lastNonNull } from "../lib/flares";
-import { fetchGoesXrays, GoesGrid } from "../lib/swpc";
+import { flareClass, fluxFormat } from "../lib/flares";
+import { fetchAurora, AuroraResult } from "../lib/sources/aurora";
+import { fetchLatestFlare, LatestFlare } from "../lib/sources/events";
+import { fetchGoesMag, GoesMagSeries } from "../lib/sources/goesMag";
+import { fetchKp, KpSeries } from "../lib/sources/kp";
+import { fetchMag, MagSeries } from "../lib/sources/mag";
+import { fetchPlasma, PlasmaSeries } from "../lib/sources/plasma";
+import { fetchProtons10MeV, ProtonsSeries } from "../lib/sources/protons";
+import { fetchXrays, XraysGrid } from "../lib/sources/xrays";
 import { localClock, relTime } from "../lib/time";
 
-const REFRESH_MS = 60_000;
-const STALE_MINUTES = 10;
-
-// Channels that aren't fetched yet — render as placeholders so the layout
-// stays honest about the build state instead of hiding the missing tiles.
-const SOL_PENDING = [
-  { key: "wind_speed", label: "Solar wind", unit: "km/s" },
-  { key: "bz", label: "IMF Bz", unit: "nT" },
-];
-const TERRA_PENDING = [
-  { key: "kp", label: "Planetary K", unit: "" },
-  { key: "aurora_extent", label: "Aurora extent", unit: "°" },
-];
+const FAST_MS = 60_000;
+const SLOW_MS = 5 * 60_000;
+const STALE_MIN = 10;
 
 type CardState = "live" | "stale" | "empty";
 
-function cardState(sampleTs: string | null, isError: boolean): CardState {
+function cardState(sampleTs: string | null | undefined, isError: boolean): CardState {
   if (isError || !sampleTs) return "empty";
   const ageMin = (Date.now() - new Date(sampleTs).getTime()) / 60_000;
-  return ageMin > STALE_MINUTES ? "stale" : "live";
+  return ageMin > STALE_MIN ? "stale" : "live";
+}
+
+function fmt(v: number | null | undefined, decimals: number): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  return v.toFixed(decimals);
+}
+
+function fmtSigned(v: number | null | undefined, decimals: number): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  return (v > 0 ? "+" : "") + v.toFixed(decimals);
 }
 
 export function Console() {
-  const goes = useQuery<GoesGrid>({
-    queryKey: ["goes_xrays"],
-    queryFn: fetchGoesXrays,
-    refetchInterval: REFRESH_MS,
-    staleTime: REFRESH_MS,
+  const xrays = useQuery<XraysGrid>({
+    queryKey: ["xrays"],
+    queryFn: fetchXrays,
+    refetchInterval: FAST_MS,
+    staleTime: FAST_MS,
+  });
+  const protons = useQuery<ProtonsSeries>({
+    queryKey: ["protons"],
+    queryFn: fetchProtons10MeV,
+    refetchInterval: FAST_MS,
+    staleTime: FAST_MS,
+  });
+  const plasma = useQuery<PlasmaSeries>({
+    queryKey: ["plasma"],
+    queryFn: fetchPlasma,
+    refetchInterval: FAST_MS,
+    staleTime: FAST_MS,
+  });
+  const mag = useQuery<MagSeries>({
+    queryKey: ["mag"],
+    queryFn: fetchMag,
+    refetchInterval: FAST_MS,
+    staleTime: FAST_MS,
+  });
+  const kp = useQuery<KpSeries>({
+    queryKey: ["kp"],
+    queryFn: fetchKp,
+    refetchInterval: FAST_MS,
+    staleTime: FAST_MS,
+  });
+  const goesMag = useQuery<GoesMagSeries>({
+    queryKey: ["goesMag"],
+    queryFn: fetchGoesMag,
+    refetchInterval: FAST_MS,
+    staleTime: FAST_MS,
+  });
+  const aurora = useQuery<AuroraResult>({
+    queryKey: ["aurora"],
+    queryFn: fetchAurora,
+    refetchInterval: SLOW_MS,
+    staleTime: SLOW_MS,
+  });
+  const events = useQuery<LatestFlare>({
+    queryKey: ["events"],
+    queryFn: fetchLatestFlare,
+    refetchInterval: SLOW_MS,
+    staleTime: SLOW_MS,
   });
 
-  const xrsB = goes.data?.channels.xrs_b ?? [];
-  const xrsA = goes.data?.channels.xrs_a ?? [];
-  const ts = goes.data?.ts ?? [];
-
-  const lastB = lastNonNull(xrsB);
-  const lastA = lastNonNull(xrsA);
-  const lastBTs = lastB ? ts[lastB.index] : null;
-  const lastATs = lastA ? ts[lastA.index] : null;
-
-  const stateB = cardState(lastBTs, goes.isError);
-  const stateA = cardState(lastATs, goes.isError);
+  const lastB = xrays.data?.latest.xrs_b ?? null;
+  const lastA = xrays.data?.latest.xrs_a ?? null;
+  const xrsB = xrays.data?.channels.xrs_b ?? [];
+  const xrsA = xrays.data?.channels.xrs_a ?? [];
 
   return (
     <div className="mx-auto flex min-h-full max-w-3xl flex-col gap-6 px-4 py-6 sm:px-6">
@@ -68,102 +111,233 @@ export function Console() {
           <Readout
             label="GOES XRS-B · flare class"
             accent="sol"
-            state={stateB}
+            state={cardState(lastB?.ts, xrays.isError)}
             value={lastB ? flareClass(lastB.value) : "—"}
-            caption={
-              lastB
-                ? `${fluxFormat(lastB.value)} W/m² · ${relTime(lastBTs)}`
-                : goes.isLoading
-                  ? "listening for first sample…"
-                  : "no samples yet"
-            }
+            caption={captionFor(lastB ? `${fluxFormat(lastB.value)} W/m² · ${relTime(lastB.ts)}` : null, xrays)}
+          >
+            <Sparkline values={xrsB} logScale yMin={1e-9} yMax={1e-4} color="#e8a23c" height={56} />
+          </Readout>
+
+          <Readout
+            label="GOES XRS-A · short band"
+            accent="sol"
+            state={cardState(lastA?.ts, xrays.isError)}
+            value={lastA ? fluxFormat(lastA.value) : "—"}
+            unit={lastA ? "W/m²" : undefined}
+            caption={captionFor(lastA ? `0.05–0.4 nm · ${relTime(lastA.ts)}` : null, xrays)}
+          >
+            <Sparkline values={xrsA} logScale yMin={1e-10} yMax={1e-5} color="#e8a23c" height={56} />
+          </Readout>
+
+          <Readout
+            label="Solar wind · speed"
+            accent="sol"
+            state={cardState(plasma.data?.latestSpeed?.ts, plasma.isError)}
+            value={fmt(plasma.data?.latestSpeed?.value, 0)}
+            unit="km/s"
+            caption={captionFor(
+              plasma.data?.latestSpeed
+                ? `DSCOVR @ L1 · ${relTime(plasma.data.latestSpeed.ts)}`
+                : null,
+              plasma,
+            )}
           >
             <Sparkline
-              values={xrsB}
-              logScale
-              yMin={1e-9}
-              yMax={1e-4}
+              values={plasma.data?.speed ?? []}
+              yMin={200}
+              yMax={900}
               color="#e8a23c"
               height={56}
             />
           </Readout>
 
           <Readout
-            label="GOES XRS-A · short band"
+            label="IMF Bz · GSM"
             accent="sol"
-            state={stateA}
-            value={lastA ? fluxFormat(lastA.value) : "—"}
-            unit={lastA ? "W/m²" : undefined}
-            caption={
-              lastA
-                ? `0.05–0.4 nm · ${relTime(lastATs)}`
-                : "0.05–0.4 nm · waiting"
-            }
+            state={cardState(mag.data?.latestBz?.ts, mag.isError)}
+            value={fmtSigned(mag.data?.latestBz?.value, 1)}
+            unit="nT"
+            caption={captionFor(
+              mag.data?.latestBz
+                ? `southward → reconnection · ${relTime(mag.data.latestBz.ts)}`
+                : null,
+              mag,
+            )}
           >
             <Sparkline
-              values={xrsA}
-              logScale
-              yMin={1e-10}
-              yMax={1e-5}
+              values={mag.data?.bz ?? []}
+              yMin={-20}
+              yMax={20}
               color="#e8a23c"
               height={56}
             />
           </Readout>
 
-          {SOL_PENDING.map((p) => (
-            <Readout
-              key={p.key}
-              label={p.label}
-              accent="sol"
-              state="empty"
-              value="—"
-              unit={p.unit}
-              caption="fetcher not wired yet"
+          <Readout
+            label="Protons · ≥10 MeV"
+            accent="sol"
+            state={cardState(protons.data?.latestTs, protons.isError)}
+            value={fmt(protons.data?.latestValue, 2)}
+            unit="pfu"
+            caption={captionFor(
+              protons.data?.latestTs
+                ? `S1 storm @ 10 pfu · ${relTime(protons.data.latestTs)}`
+                : null,
+              protons,
+            )}
+          >
+            <Sparkline
+              values={protons.data?.values ?? []}
+              logScale
+              yMin={1e-2}
+              yMax={1e4}
+              color="#e8a23c"
+              height={56}
             />
-          ))}
+          </Readout>
+
+          <Readout
+            label="Latest flare event"
+            accent="sol"
+            state={cardState(events.data?.beginTs, events.isError)}
+            value={events.data?.flareClass ?? "—"}
+            caption={captionFor(
+              events.data?.beginTs && events.data.flareClass
+                ? `${events.data.region ? `AR ${events.data.region} · ` : ""}${relTime(events.data.maxTs ?? events.data.beginTs)}`
+                : events.data && !events.data.flareClass
+                  ? "no recent XRA in window"
+                  : null,
+              events,
+            )}
+          />
         </div>
       </div>
 
       <div>
         <h2 className="mb-2 text-[10px] uppercase tracking-[0.18em] text-terra">Terra</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {TERRA_PENDING.map((p) => (
-            <Readout
-              key={p.key}
-              label={p.label}
-              accent="terra"
-              state="empty"
-              value="—"
-              unit={p.unit}
-              caption="fetcher not wired yet"
+          <Readout
+            label="Planetary K"
+            accent="terra"
+            state={cardState(kp.data?.latest?.ts, kp.isError)}
+            value={fmt(kp.data?.latest?.value, 2)}
+            caption={captionFor(
+              kp.data?.latest
+                ? `0–9 scale, 1-min estimate · ${relTime(kp.data.latest.ts)}`
+                : null,
+              kp,
+            )}
+          >
+            <Sparkline
+              values={kp.data?.values ?? []}
+              yMin={0}
+              yMax={9}
+              color="#5fb3a3"
+              height={56}
             />
-          ))}
+          </Readout>
+
+          <Readout
+            label="GOES mag · Hp"
+            accent="terra"
+            state={cardState(goesMag.data?.latestHp?.ts, goesMag.isError)}
+            value={fmtSigned(goesMag.data?.latestHp?.value, 0)}
+            unit="nT"
+            caption={captionFor(
+              goesMag.data?.latestHp
+                ? `GEO field · ${relTime(goesMag.data.latestHp.ts)}`
+                : null,
+              goesMag,
+            )}
+          >
+            <Sparkline
+              values={goesMag.data?.hp ?? []}
+              yMin={-100}
+              yMax={200}
+              color="#5fb3a3"
+              height={56}
+            />
+          </Readout>
+
+          <Readout
+            label="Aurora · equatorward extent N"
+            accent="terra"
+            state={cardState(aurora.data?.observationTs, aurora.isError)}
+            value={
+              aurora.data?.extentDegN != null
+                ? `${aurora.data.extentDegN.toFixed(0)}°`
+                : "—"
+            }
+            caption={captionFor(
+              aurora.data?.observationTs
+                ? `OVATION 30-min · ${relTime(aurora.data.forecastTs ?? aurora.data.observationTs)}`
+                : null,
+              aurora,
+            )}
+          />
+
+          <Readout
+            label="USGS Boulder mag"
+            accent="terra"
+            state="empty"
+            value="—"
+            unit="nT"
+            caption="needs Netlify Function (USGS CORS unverified)"
+          />
+
+          <Readout
+            label="Kyoto Dst quicklook"
+            accent="terra"
+            state="empty"
+            value="—"
+            unit="nT"
+            caption="needs Netlify Function (WDC Kyoto, no CORS)"
+          />
         </div>
       </div>
 
       <StatusLine
-        lastSampleTs={goes.data?.lastSampleTs ?? null}
-        loading={goes.isLoading}
-        fetchError={goes.error?.message ?? null}
+        queries={[
+          ["xrays", xrays],
+          ["protons", protons],
+          ["plasma", plasma],
+          ["mag", mag],
+          ["kp", kp],
+          ["goesMag", goesMag],
+          ["aurora", aurora],
+          ["events", events],
+        ]}
       />
     </div>
   );
 }
 
-function StatusLine(props: {
-  lastSampleTs: string | null;
-  loading: boolean;
-  fetchError: string | null;
-}) {
+type QueryLike = {
+  isError: boolean;
+  isLoading: boolean;
+  error: Error | null;
+};
+
+function captionFor(text: string | null, q: QueryLike): ReactNode {
+  if (text) return text;
+  if (q.isError) return `fetch failed: ${q.error?.message ?? "unknown"}`;
+  if (q.isLoading) return "listening…";
+  return "no samples yet";
+}
+
+function StatusLine(props: { queries: [string, QueryLike][] }) {
+  const errors = props.queries.filter(([, q]) => q.isError);
+  const loading = props.queries.filter(([, q]) => q.isLoading);
   let msg: string;
-  if (props.fetchError) {
-    msg = `SWPC unreachable — ${props.fetchError}`;
-  } else if (props.loading) {
-    msg = "Listening…";
-  } else if (props.lastSampleTs) {
-    msg = `GOES X-rays current as of ${relTime(props.lastSampleTs)}. Remaining sources land in build step 3.`;
+  if (errors.length === props.queries.length) {
+    msg = `All ${errors.length} sources unreachable — check network / SWPC CORS.`;
+  } else if (errors.length > 0) {
+    const names = errors.map(([n]) => n).join(", ");
+    msg = `${errors.length}/${props.queries.length} sources failing: ${names}`;
+  } else if (loading.length > 0) {
+    msg = `Listening (${props.queries.length - loading.length}/${props.queries.length} live)…`;
   } else {
-    msg = "Waiting for first GOES sample…";
+    msg = `All ${props.queries.length} sources current. Boulder + Dst pending (need backend).`;
   }
   return (
     <footer className="mt-auto border-t border-console-line pt-3 text-xs text-console-dim">
