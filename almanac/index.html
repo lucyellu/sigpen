@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field Guide to Celestial Objects — One Sheet</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f4ede0;
+    --paper-shade: #ebe2cf;
+    --ink: #1a1612;
+    --ink-soft: #3d362c;
+    --ink-faint: #8a7f6d;
+    --rule: #c9bea5;
+    --accent: #b8430e;
+    --accent-soft: #d4a574;
+    --moss: #5a6b3a;
+    --plum: #5a2a3d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 300;
+    font-size: 13px;
+    line-height: 1.55;
+    padding: 36px 40px 60px;
+    max-width: 920px;
+    margin: 0 auto;
+    background-image:
+      radial-gradient(ellipse at 20% 10%, rgba(212, 165, 116, 0.08), transparent 50%),
+      radial-gradient(ellipse at 80% 90%, rgba(184, 67, 14, 0.04), transparent 50%);
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.5'/></svg>");
+    opacity: 0.06;
+    z-index: 9999;
+  }
+
+  /* Header */
+  header {
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 18px;
+    margin-bottom: 26px;
+    position: relative;
+  }
+  .eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 8px;
+  }
+  h1 {
+    font-family: 'DM Serif Display', serif;
+    font-weight: 400;
+    font-size: clamp(2.4rem, 6vw, 3.8rem);
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  h1 .it {
+    font-style: italic;
+    color: var(--accent);
+  }
+  .subtitle {
+    margin-top: 14px;
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 1.15rem;
+    color: var(--ink-soft);
+    max-width: 640px;
+  }
+  .meta-row {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .meta-row span:not(:last-child)::after {
+    content: ' ·';
+    color: var(--ink-faint);
+    margin-left: 18px;
+  }
+  .corner-mark {
+    position: absolute;
+    top: 0;
+    right: 0;
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 0.85rem;
+    color: var(--ink-faint);
+    text-align: right;
+    line-height: 1.3;
+  }
+
+  /* Section blocks */
+  section {
+    margin-bottom: 32px;
+  }
+  h2 {
+    font-family: 'DM Serif Display', serif;
+    font-weight: 400;
+    font-size: 1.55rem;
+    margin-bottom: 6px;
+    color: var(--ink);
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  h2 .num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    font-weight: 500;
+  }
+  h2 .em-line {
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+    align-self: center;
+  }
+  .lede {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 1.08rem;
+    color: var(--ink-soft);
+    margin-bottom: 14px;
+    max-width: 720px;
+  }
+  p {
+    margin-bottom: 10px;
+    max-width: 720px;
+  }
+  strong { font-weight: 500; color: var(--ink); }
+  em { color: var(--ink-soft); font-style: italic; }
+
+  /* Premise card */
+  .premise {
+    background: var(--paper-shade);
+    border-left: 3px solid var(--accent);
+    padding: 18px 22px;
+    margin-bottom: 24px;
+  }
+  .premise .lede {
+    margin-bottom: 0;
+    font-size: 1.15rem;
+  }
+
+  /* Specimen cards */
+  .specimens {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+    margin-top: 12px;
+  }
+  .specimen {
+    border: 1px solid var(--rule);
+    padding: 14px 16px;
+    background: rgba(255, 255, 255, 0.3);
+    position: relative;
+  }
+  .specimen .tag {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .specimen .latin {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 1.05rem;
+    margin-bottom: 2px;
+    color: var(--ink);
+  }
+  .specimen .common {
+    font-size: 11px;
+    color: var(--ink-faint);
+    margin-bottom: 10px;
+    font-style: italic;
+  }
+  .specimen .stat {
+    font-size: 11px;
+    margin-bottom: 3px;
+  }
+  .specimen .stat span {
+    display: inline-block;
+    width: 70px;
+    color: var(--ink-faint);
+  }
+  .specimen .note {
+    margin-top: 8px;
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+    border-top: 1px dashed var(--rule);
+    padding-top: 7px;
+  }
+
+  /* Layer schema */
+  .schema {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px 18px;
+    margin-top: 8px;
+  }
+  .schema .layer {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 0.95rem;
+    color: var(--accent);
+    white-space: nowrap;
+    padding-top: 2px;
+  }
+  .schema .desc {
+    font-size: 12px;
+    color: var(--ink-soft);
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--rule);
+  }
+  .schema .desc:last-child { border-bottom: none; }
+
+  /* To-poke list */
+  ul.scratch {
+    list-style: none;
+    padding: 0;
+    margin-top: 8px;
+  }
+  ul.scratch li {
+    padding: 6px 0 6px 22px;
+    position: relative;
+    border-bottom: 1px dotted var(--rule);
+    font-size: 12px;
+  }
+  ul.scratch li::before {
+    content: '○';
+    position: absolute;
+    left: 4px;
+    top: 6px;
+    color: var(--accent);
+    font-size: 10px;
+  }
+  ul.scratch li:last-child { border-bottom: none; }
+
+  /* Mini-diagram: the ripeness curve */
+  .curve-wrap {
+    margin: 16px 0 8px;
+    background: var(--paper-shade);
+    padding: 18px 20px 24px;
+    border: 1px solid var(--rule);
+  }
+  .curve-wrap svg { width: 100%; height: auto; }
+  .curve-caption {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  /* Footer */
+  footer {
+    margin-top: 40px;
+    border-top: 2px solid var(--ink);
+    padding-top: 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  footer .signoff {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 1.1rem;
+    color: var(--ink-soft);
+  }
+  footer .stamp {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  /* Marginalia */
+  .margin-note {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 0.9rem;
+    color: var(--ink-faint);
+    padding: 4px 0 4px 12px;
+    border-left: 2px solid var(--accent-soft);
+    margin: 8px 0;
+    max-width: 600px;
+  }
+
+  @media print {
+    body { padding: 20px; }
+    body::before { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="corner-mark">
+    No. 001<br>
+    one-sheet<br>
+    sketch
+  </div>
+  <div class="eyebrow">A Field Guide Toward · Working Title</div>
+  <h1>The <span class="it">Celestial</span><br>Almanac</h1>
+  <div class="subtitle">A field guide to the species of stars, planets, and systems — organized not by what they are, but by where they are in their ripening.</div>
+  <div class="meta-row">
+    <span>not a grant proposal</span>
+    <span>not a startup</span>
+    <span>a project that wants a sketch file</span>
+  </div>
+</header>
+
+<section class="premise">
+  <div class="lede">
+    Astronomy gives us databases. Field guides give us recognition.
+    The Almanac is what sits between them — a way of looking at the sky
+    that names <em>kinds</em> the way a birder names warblers, and tracks
+    <em>stages</em> the way an orchardist tracks fruit.
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">§01</span> Premise <span class="em-line"></span></h2>
+  <p>
+    Every celestial object is somewhere on a curve. Stars are born, settle, age, and die.
+    Planets accrete, differentiate, weather, and either ripen toward complexity or pass
+    without ever becoming legible. <strong>The curve is real. The framework that names
+    where each object sits on its curve is mostly missing.</strong>
+  </p>
+  <p>
+    The Almanac is a sketch of that framework — a typological field guide where each
+    entry tells you not just what an object is, but <em>what stage of itself</em> it is,
+    and what comes next.
+  </p>
+  <div class="margin-note">
+    The Earth Similarity Index ranks everything by how Earth-like it is. A peach scores low on
+    banana-similarity. We need a better question.
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">§02</span> The Ripeness Curve <span class="em-line"></span></h2>
+  <div class="curve-wrap">
+    <svg viewBox="0 0 600 180" xmlns="http://www.w3.org/2000/svg">
+      <!-- axes -->
+      <line x1="40" y1="150" x2="580" y2="150" stroke="#8a7f6d" stroke-width="1"/>
+      <line x1="40" y1="20" x2="40" y2="150" stroke="#8a7f6d" stroke-width="1"/>
+
+      <!-- axis labels -->
+      <text x="310" y="172" font-family="IBM Plex Mono" font-size="10" fill="#8a7f6d" text-anchor="middle" letter-spacing="2">TIME →</text>
+      <text x="20" y="85" font-family="IBM Plex Mono" font-size="10" fill="#8a7f6d" text-anchor="middle" letter-spacing="2" transform="rotate(-90 20 85)">SIGNAL</text>
+
+      <!-- curve: accrete -> ripe -> rot/transcend -->
+      <path d="M 40 145 Q 120 140, 180 100 T 320 35 Q 380 30, 430 55 T 580 130"
+            fill="none" stroke="#b8430e" stroke-width="2.2"/>
+
+      <!-- stage markers -->
+      <circle cx="80" cy="143" r="3" fill="#1a1612"/>
+      <text x="80" y="165" font-family="IBM Plex Mono" font-size="9" fill="#3d362c" text-anchor="middle">FORMING</text>
+
+      <circle cx="180" cy="100" r="3" fill="#1a1612"/>
+      <text x="180" y="165" font-family="IBM Plex Mono" font-size="9" fill="#3d362c" text-anchor="middle">SETTLING</text>
+
+      <circle cx="320" cy="35" r="4" fill="#b8430e"/>
+      <text x="320" y="22" font-family="DM Serif Display" font-style="italic" font-size="12" fill="#b8430e" text-anchor="middle">ripe</text>
+      <text x="320" y="165" font-family="IBM Plex Mono" font-size="9" fill="#3d362c" text-anchor="middle">DETECTABLE</text>
+
+      <circle cx="430" cy="55" r="3" fill="#1a1612"/>
+      <text x="430" y="165" font-family="IBM Plex Mono" font-size="9" fill="#3d362c" text-anchor="middle">STRESSED</text>
+
+      <circle cx="540" cy="125" r="3" fill="#1a1612"/>
+      <text x="540" y="165" font-family="IBM Plex Mono" font-size="9" fill="#3d362c" text-anchor="middle">PAST / QUIET</text>
+
+      <!-- you are here marker, sitting near 'detectable' -->
+      <line x1="320" y1="35" x2="320" y2="80" stroke="#5a2a3d" stroke-width="1" stroke-dasharray="2,3"/>
+      <text x="328" y="78" font-family="Cormorant Garamond" font-style="italic" font-size="11" fill="#5a2a3d">you (probably) are here</text>
+    </svg>
+    <div class="curve-caption">The shape repeats. The timescale does not. A G-dwarf orchard ripens on 10⁹-year scales; an M-dwarf system may ripen on 10¹⁰; a Hycean world, we don't yet know.</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">§03</span> Specimen Cards (sketches) <span class="em-line"></span></h2>
+  <p>Each entry in the eventual almanac would read like this. Three stubs to start:</p>
+
+  <div class="specimens">
+    <div class="specimen">
+      <div class="tag">Type 01 · TERRESTRIAL</div>
+      <div class="latin">Mundus vitalis communis</div>
+      <div class="common">"the common living world"</div>
+      <div class="stat"><span>host:</span> G/K dwarf</div>
+      <div class="stat"><span>age:</span> 1–8 Gyr</div>
+      <div class="stat"><span>signal:</span> O₂ + CH₄ disequilibrium</div>
+      <div class="stat"><span>failures:</span> runaway greenhouse, magnetic collapse</div>
+      <div class="note">Earth. Possibly K2-18b. Our entire reference set is here, which is the problem.</div>
+    </div>
+
+    <div class="specimen">
+      <div class="tag">Type 02 · POST-OCEANIC</div>
+      <div class="latin">Mundus aridus</div>
+      <div class="common">"the dried world"</div>
+      <div class="stat"><span>host:</span> any</div>
+      <div class="stat"><span>age:</span> variable</div>
+      <div class="stat"><span>signal:</span> oxidized surface, thin atmosphere</div>
+      <div class="stat"><span>failures:</span> already failed (or transcended)</div>
+      <div class="note">Mars. The world that didn't make it, or made it past and we missed the window.</div>
+    </div>
+
+    <div class="specimen">
+      <div class="tag">Type 03 · OVERCOOKED</div>
+      <div class="latin">Mundus ardens</div>
+      <div class="common">"the burning world"</div>
+      <div class="stat"><span>host:</span> any inner orbit</div>
+      <div class="stat"><span>age:</span> post-ripeness</div>
+      <div class="stat"><span>signal:</span> CO₂ choke, sulfuric clouds</div>
+      <div class="stat"><span>failures:</span> the obvious one</div>
+      <div class="note">Venus. Possibly once-ripe. A cautionary entry; every almanac needs one.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">§04</span> Layers the Almanac Would Track <span class="em-line"></span></h2>
+  <div class="schema">
+    <div class="layer">Genealogy</div>
+    <div class="desc">Which stars share a birth cluster. Sibling systems. Stellar streams. The "litter" any given object came from.</div>
+
+    <div class="layer">Type</div>
+    <div class="desc">G-dwarf terrestrial, M-dwarf tightly-packed, Hycean, ocean world, tidally locked, post-oceanic. Each with its own ripening curve.</div>
+
+    <div class="layer">Stage</div>
+    <div class="desc">Where on its curve. Forming, settling, detectable, stressed, past. Same axis for everything, even though the units differ wildly.</div>
+
+    <div class="layer">Neighborhood</div>
+    <div class="desc">Where in the galaxy. GHZ position, local stellar density, recent flyby encounters, upcoming threats (red giant neighbors, supernova candidates).</div>
+
+    <div class="layer">Flux</div>
+    <div class="desc">Not just "what signals are present" but <em>is the cycle closing?</em> Are creation signals matched to decay signals? Fungi-equivalent processes running?</div>
+
+    <div class="layer">Biography</div>
+    <div class="desc">Each entry has a <em>story</em>, not just a row in a database. A field guide is read; a database is queried.</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">§05</span> What "Doing The Project" Looks Like <span class="em-line"></span></h2>
+  <ul class="scratch">
+    <li>Pick 12 specimens. Real ones. Earth, Mars, Venus, Titan, Europa, Proxima b, TRAPPIST-1e, K2-18b, Kepler-452b, our Sun, Betelgeuse, the Pleiades cluster.</li>
+    <li>Draft a single-page entry for each in the specimen-card style above. Latin name (made up is fine), type, stage, signal markers, biography.</li>
+    <li>Build a simple web version. One page per specimen. Cross-links by type and neighborhood. Could be flat HTML; could be a small static site.</li>
+    <li>Steal aesthetics from real field guides: Sibley, Peterson, the Audubon plates. Hand-feel beats database-feel.</li>
+    <li>Resist the urge to be comprehensive. Twelve good entries is more useful than two hundred thin ones.</li>
+    <li>Share when ready. Watch what catches.</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="num">§06</span> Why It's Worth Doing (Even As Fun) <span class="em-line"></span></h2>
+  <p>
+    The night sky is one of the few things every human alive can look at directly. Modern astronomy has
+    made it more known and less <em>familiar</em> — people see "stars" where they used to see kinds.
+    A field guide that gave back the sense of <strong>distinct species of celestial things, each with its
+    own life</strong>, would be a small act of relegibility.
+  </p>
+  <p>
+    Worst case: a nice weekend project that produces something beautiful.<br>
+    Best case: a framework other people start adding entries to.<br>
+    Either way: the sketch file stays open.
+  </p>
+</section>
+
+<footer>
+  <div class="signoff">an orchard, viewed slowly, by someone willing to learn the trees.</div>
+  <div class="stamp">v.0.1 · sketch · keep loose</div>
+</footer>
+
+</body>
+</html>
